@@ -35,6 +35,7 @@ func main() {
 	Ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	log.G(Ctx).Debug("Debug level: " + strconv.FormatBool(interLinkConfig.VerboseLogging))
+	//log.G(Ctx).Error("è passato Matteo")
 
 	SidecarAPIs := slurm.SidecarHandler{
 		Config: interLinkConfig,
