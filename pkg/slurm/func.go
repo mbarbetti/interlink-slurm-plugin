@@ -47,7 +47,7 @@ func NewSlurmConfig() (SlurmConfig, error) {
 			return SlurmConfig{}, err
 		}
 
-		log.G(context.Background()).Info("Loading SLURM config from " + path)
+		log.G(context.Background()).Info("Loading Slurm config from " + path)
 		yfile, err := os.ReadFile(path)
 		if err != nil {
 			log.G(context.Background()).Error("Error opening config file, exiting...")

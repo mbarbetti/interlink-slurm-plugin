@@ -22,7 +22,7 @@ import (
 	commonIL "github.com/intertwin-eu/interlink/pkg/interlink"
 )
 
-type SidecarHandler struct {
+type PluginHandler struct {
 	Config SlurmConfig
 	JIDs   *map[string]*JidStruct
 	Ctx    context.Context

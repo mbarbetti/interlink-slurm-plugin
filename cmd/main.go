@@ -33,19 +33,19 @@ func main() {
 	JobIDs := make(map[string]*slurm.JidStruct)
 	Ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	log.G(Ctx).Debug("Debug level: " + strconv.FormatBool(interLinkConfig.VerboseLogging))
+	log.G(Ctx).Debug("Debug level: " + strconv.FormatBool(slurmConfig.VerboseLogging))
 
-	SidecarAPIs := slurm.SidecarHandler{
+	PluginAPIs := slurm.PluginHandler{
 		Config: slurmConfig,
 		JIDs:   &JobIDs,
 		Ctx:    Ctx,
 	}
 
 	mutex := http.NewServeMux()
-	mutex.HandleFunc("/status", SidecarAPIs.StatusHandler)
-	mutex.HandleFunc("/create", SidecarAPIs.SubmitHandler)
-	mutex.HandleFunc("/delete", SidecarAPIs.StopHandler)
-	mutex.HandleFunc("/getLogs", SidecarAPIs.GetLogsHandler)
+	mutex.HandleFunc("/status", PluginAPIs.StatusHandler)
+	mutex.HandleFunc("/create", PluginAPIs.SubmitHandler)
+	mutex.HandleFunc("/delete", PluginAPIs.StopHandler)
+	mutex.HandleFunc("/getLogs", PluginAPIs.GetLogsHandler)
 
 	slurm.CreateDirectories(slurmConfig)
 	slurm.LoadJIDs(Ctx, slurmConfig, &JobIDs)
