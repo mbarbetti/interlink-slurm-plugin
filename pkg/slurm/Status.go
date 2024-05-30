@@ -20,33 +20,30 @@ import (
 )
 
 // StatusHandler performs a squeue --me and uses regular expressions to get the running Jobs' status
-func (h *SidecarHandler) StatusHandler(w http.ResponseWriter, r *http.Request) {
-	var req []*v1.Pod
-	var resp []commonIL.PodStatus
-	statusCode := http.StatusOK
+func (h *PluginHandler) StatusHandler(w http.ResponseWriter, r *http.Request) {
 	log.G(h.Ctx).Info("Slurm Sidecar: received GetStatus call")
 	timeNow := time.Now()
 
-	bodyBytes, err := io.ReadAll(r.Body)
-	if err != nil {
-		statusCode = http.StatusInternalServerError
-		w.WriteHeader(statusCode)
-		w.Write([]byte("Some errors occurred while retrieving container status. Check Slurm Sidecar's logs"))
-		log.G(h.Ctx).Error(err)
-		return
-	}
+	log.G(h.Ctx).Error("Pippo #1")
+	bodyBytes, _ := ReadRequestBody(r, w, h)
+	log.G(h.Ctx).Error("Pippo #2")
+	podSlice, statusCode := ParseStatusJson(bodyBytes, w, h)
+	log.G(h.Ctx).Error("Pippo #3")
+	//var podSlice []*v1.Pod
+	//err := json.Unmarshal(bodyBytes, &podSlice)
+	//if err != nil {
+	//	statusCode = http.StatusInternalServerError
+	//	w.WriteHeader(statusCode)
+	//	w.Write([]byte("Some errors occurred while retrieving container status. Check Slurm Sidecar's logs"))
+	//	log.G(h.Ctx).Error(err)
+	//	return
+	//}
 
-	err = json.Unmarshal(bodyBytes, &req)
-	if err != nil {
-		statusCode = http.StatusInternalServerError
-		w.WriteHeader(statusCode)
-		w.Write([]byte("Some errors occurred while retrieving container status. Check Slurm Sidecar's logs"))
-		log.G(h.Ctx).Error(err)
-		return
-	}
+	var resp []commonIL.PodStatus
+	log.G(h.Ctx).Error("Pippo #4")
 
 	if timeNow.Sub(timer) >= time.Second*10 {
-		cmd := []string{"--me"}
+		cmd := []string{"-u $USER"}
 		shell := exec.ExecTask{
 			Command: "squeue",
 			Args:    cmd,
@@ -58,12 +55,12 @@ func (h *SidecarHandler) StatusHandler(w http.ResponseWriter, r *http.Request) {
 		if execReturn.Stderr != "" {
 			statusCode = http.StatusInternalServerError
 			w.WriteHeader(statusCode)
-			w.Write([]byte("Error executing Squeue. Check Slurm Sidecar's logs"))
+			w.Write([]byte("Error executing Squeue. Check Slurm Plugin's logs"))
 			log.G(h.Ctx).Error("Unable to retrieve job status: " + execReturn.Stderr)
 			return
 		}
 
-		for _, pod := range req {
+		for _, pod := range podSlice {
 			containerStatuses := []v1.ContainerStatus{}
 			uid := string(pod.UID)
 			path := h.Config.DataRootFolder + pod.Namespace + "-" + string(pod.UID)
@@ -88,7 +85,7 @@ func (h *SidecarHandler) StatusHandler(w http.ResponseWriter, r *http.Request) {
 						if err != nil {
 							statusCode = http.StatusInternalServerError
 							w.WriteHeader(statusCode)
-							w.Write([]byte("Error retrieving container status. Check Slurm Sidecar's logs"))
+							w.Write([]byte("Error retrieving container status. Check Slurm Plugin's logs"))
 							log.G(h.Ctx).Error(fmt.Errorf("unable to retrieve container status: %s", err))
 							return
 						}
@@ -97,7 +94,7 @@ func (h *SidecarHandler) StatusHandler(w http.ResponseWriter, r *http.Request) {
 						if err != nil {
 							statusCode = http.StatusInternalServerError
 							w.WriteHeader(statusCode)
-							w.Write([]byte("Error reading container status. Check Slurm Sidecar's logs"))
+							w.Write([]byte("Error reading container status. Check Slurm Plugin's logs"))
 							log.G(h.Ctx).Error(fmt.Errorf("unable to read container status: %s", err))
 							return
 						}
@@ -106,7 +103,7 @@ func (h *SidecarHandler) StatusHandler(w http.ResponseWriter, r *http.Request) {
 						if err != nil {
 							statusCode = http.StatusInternalServerError
 							w.WriteHeader(statusCode)
-							w.Write([]byte("Error converting container status.. Check Slurm Sidecar's logs"))
+							w.Write([]byte("Error converting container status.. Check Slurm Plugin's logs"))
 							log.G(h.Ctx).Error(fmt.Errorf("unable to convert container status: %s", err))
 							status = 500
 						}
@@ -142,7 +139,7 @@ func (h *SidecarHandler) StatusHandler(w http.ResponseWriter, r *http.Request) {
 							if err != nil {
 								statusCode = http.StatusInternalServerError
 								w.WriteHeader(statusCode)
-								w.Write([]byte("Error writing end timestamp... Check Slurm Sidecar's logs"))
+								w.Write([]byte("Error writing end timestamp... Check Slurm Plugin's logs"))
 								log.G(h.Ctx).Error(err)
 								return
 							}
@@ -160,7 +157,7 @@ func (h *SidecarHandler) StatusHandler(w http.ResponseWriter, r *http.Request) {
 							if err != nil {
 								statusCode = http.StatusInternalServerError
 								w.WriteHeader(statusCode)
-								w.Write([]byte("Error writing start timestamp... Check Slurm Sidecar's logs"))
+								w.Write([]byte("Error writing start timestamp... Check Slurm Plugin's logs"))
 								log.G(h.Ctx).Error(err)
 								return
 							}
@@ -178,7 +175,7 @@ func (h *SidecarHandler) StatusHandler(w http.ResponseWriter, r *http.Request) {
 							if err != nil {
 								statusCode = http.StatusInternalServerError
 								w.WriteHeader(statusCode)
-								w.Write([]byte("Error writing end timestamp... Check Slurm Sidecar's logs"))
+								w.Write([]byte("Error writing end timestamp... Check Slurm Plugin's logs"))
 								log.G(h.Ctx).Error(err)
 								return
 							}
@@ -202,7 +199,7 @@ func (h *SidecarHandler) StatusHandler(w http.ResponseWriter, r *http.Request) {
 							if err != nil {
 								statusCode = http.StatusInternalServerError
 								w.WriteHeader(statusCode)
-								w.Write([]byte("Error writing end timestamp... Check Slurm Sidecar's logs"))
+								w.Write([]byte("Error writing end timestamp... Check Slurm Plugin's logs"))
 								log.G(h.Ctx).Error(err)
 								return
 							}
@@ -220,7 +217,7 @@ func (h *SidecarHandler) StatusHandler(w http.ResponseWriter, r *http.Request) {
 							if err != nil {
 								statusCode = http.StatusInternalServerError
 								w.WriteHeader(statusCode)
-								w.Write([]byte("Error writing start timestamp... Check Slurm Sidecar's logs"))
+								w.Write([]byte("Error writing start timestamp... Check Slurm Plugin's logs"))
 								log.G(h.Ctx).Error(err)
 								return
 							}
@@ -244,7 +241,7 @@ func (h *SidecarHandler) StatusHandler(w http.ResponseWriter, r *http.Request) {
 							if err != nil {
 								statusCode = http.StatusInternalServerError
 								w.WriteHeader(statusCode)
-								w.Write([]byte("Error writing end timestamp... Check Slurm Sidecar's logs"))
+								w.Write([]byte("Error writing end timestamp... Check Slurm Plugin's logs"))
 								log.G(h.Ctx).Error(err)
 								return
 							}
@@ -262,7 +259,7 @@ func (h *SidecarHandler) StatusHandler(w http.ResponseWriter, r *http.Request) {
 							if err != nil {
 								statusCode = http.StatusInternalServerError
 								w.WriteHeader(statusCode)
-								w.Write([]byte("Error writing end timestamp... Check Slurm Sidecar's logs"))
+								w.Write([]byte("Error writing end timestamp... Check Slurm Plugin's logs"))
 								log.G(h.Ctx).Error(err)
 								return
 							}
@@ -295,12 +292,12 @@ func (h *SidecarHandler) StatusHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(statusCode)
 	if statusCode != http.StatusOK {
-		w.Write([]byte("Some errors occurred deleting containers. Check Docker Sidecar's logs"))
+		w.Write([]byte("Some errors occurred deleting containers. Check Slurm Plugin's logs"))
 	} else {
 		bodyBytes, err := json.Marshal(resp)
 		if err != nil {
 			w.WriteHeader(statusCode)
-			w.Write([]byte("Some errors occurred while retrieving container status. Check Slurm Sidecar's logs"))
+			w.Write([]byte("Some errors occurred while retrieving container status. Check Slurm Plugin's logs"))
 			log.G(h.Ctx).Error(err)
 			return
 		}

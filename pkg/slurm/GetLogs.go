@@ -1,55 +1,34 @@
 package slurm
 
 import (
-	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/containerd/containerd/log"
-
-	commonIL "github.com/intertwin-eu/interlink/pkg/interlink"
 )
 
 // GetLogsHandler reads Jobs' output file to return what's logged inside.
 // What's returned is based on the provided parameters (Tail/LimitBytes/Timestamps/etc)
-func (h *SidecarHandler) GetLogsHandler(w http.ResponseWriter, r *http.Request) {
+func (h *PluginHandler) GetLogsHandler(w http.ResponseWriter, r *http.Request) {
 	log.G(h.Ctx).Info("Docker Sidecar: received GetLogs call")
-	var req commonIL.LogStruct
-	statusCode := http.StatusOK
-	currentTime := time.Now()
+	reqTime := time.Now()
 
-	bodyBytes, err := io.ReadAll(r.Body)
-	if err != nil {
-		statusCode = http.StatusInternalServerError
-		w.WriteHeader(statusCode)
-		w.Write([]byte("Some errors occurred while checking log requests raw message. Check Docker Sidecar's logs"))
-		log.G(h.Ctx).Error(err)
-		return
-	}
+	bodyBytes, _ := ReadRequestBody(r, w, h)
+	logStruct, statusCode := ParseLogsJson(bodyBytes, w, h)
 
-	err = json.Unmarshal(bodyBytes, &req)
-	if err != nil {
-		statusCode = http.StatusInternalServerError
-		w.WriteHeader(statusCode)
-		w.Write([]byte("Some errors occurred while unmarshalling log request. Check Docker Sidecar's logs"))
-		log.G(h.Ctx).Error(err)
-		return
-	}
-
-	path := h.Config.DataRootFolder + req.Namespace + "-" + req.PodUID
+	path := h.Config.DataRootFolder + logStruct.Namespace + "-" + logStruct.PodUID
 	var output []byte
-	if req.Opts.Timestamps {
+	if logStruct.Opts.Timestamps {
 		log.G(h.Ctx).Error(errors.New("Not Implemented"))
 		statusCode = http.StatusInternalServerError
 		w.WriteHeader(statusCode)
 		return
 	} else {
-		log.G(h.Ctx).Info("Reading  " + path + "/" + req.ContainerName + ".out")
-		containerOutput, err1 := os.ReadFile(path + "/" + req.ContainerName + ".out")
+		log.G(h.Ctx).Info("Reading  " + path + "/" + logStruct.ContainerName + ".out")
+		containerOutput, err1 := os.ReadFile(path + "/" + logStruct.ContainerName + ".out")
 		if err1 != nil {
 			log.G(h.Ctx).Error("Failed to read container logs.")
 		}
@@ -72,26 +51,26 @@ func (h *SidecarHandler) GetLogsHandler(w http.ResponseWriter, r *http.Request) 
 
 	var returnedLogs string
 
-	if req.Opts.Tail != 0 {
+	if logStruct.Opts.Tail != 0 {
 		var lastLines []string
 
 		splittedLines := strings.Split(string(output), "\n")
 
-		if req.Opts.Tail > len(splittedLines) {
+		if logStruct.Opts.Tail > len(splittedLines) {
 			lastLines = splittedLines
 		} else {
-			lastLines = splittedLines[len(splittedLines)-req.Opts.Tail-1:]
+			lastLines = splittedLines[len(splittedLines)-logStruct.Opts.Tail-1:]
 		}
 
 		for _, line := range lastLines {
 			returnedLogs += line + "\n"
 		}
-	} else if req.Opts.LimitBytes != 0 {
+	} else if logStruct.Opts.LimitBytes != 0 {
 		var lastBytes []byte
-		if req.Opts.LimitBytes > len(output) {
+		if logStruct.Opts.LimitBytes > len(output) {
 			lastBytes = output
 		} else {
-			lastBytes = output[len(output)-req.Opts.LimitBytes-1:]
+			lastBytes = output[len(output)-logStruct.Opts.LimitBytes-1:]
 		}
 
 		returnedLogs = string(lastBytes)
@@ -99,7 +78,7 @@ func (h *SidecarHandler) GetLogsHandler(w http.ResponseWriter, r *http.Request) 
 		returnedLogs = string(output)
 	}
 
-	if req.Opts.Timestamps && (req.Opts.SinceSeconds != 0 || !req.Opts.SinceTime.IsZero()) {
+	if logStruct.Opts.Timestamps && (logStruct.Opts.SinceSeconds != 0 || !logStruct.Opts.SinceTime.IsZero()) {
 		temp := returnedLogs
 		returnedLogs = ""
 		splittedLogs := strings.Split(temp, "\n")
@@ -112,12 +91,12 @@ func (h *SidecarHandler) GetLogsHandler(w http.ResponseWriter, r *http.Request) 
 			if err != nil {
 				continue
 			}
-			if req.Opts.SinceSeconds != 0 {
-				if currentTime.Sub(timestamp).Seconds() > float64(req.Opts.SinceSeconds) {
+			if logStruct.Opts.SinceSeconds != 0 {
+				if reqTime.Sub(timestamp).Seconds() > float64(logStruct.Opts.SinceSeconds) {
 					returnedLogs += Log + "\n"
 				}
 			} else {
-				if timestamp.Sub(req.Opts.SinceTime).Seconds() >= 0 {
+				if timestamp.Sub(logStruct.Opts.SinceTime).Seconds() >= 0 {
 					returnedLogs += Log + "\n"
 				}
 			}
@@ -125,7 +104,7 @@ func (h *SidecarHandler) GetLogsHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if statusCode != http.StatusOK {
-		w.Write([]byte("Some errors occurred while checking container status. Check Docker Sidecar's logs"))
+		w.Write([]byte("Some errors occurred while checking container status. Check Slurm Plugin's logs"))
 	} else {
 		w.WriteHeader(statusCode)
 		w.Write([]byte(returnedLogs))
